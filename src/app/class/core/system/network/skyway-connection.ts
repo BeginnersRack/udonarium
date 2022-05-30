@@ -6,6 +6,7 @@ import { PeerContext } from './peer-context';
 import { PeerSessionGrade } from './peer-session-state';
 import { SkyWayDataConnection } from './skyway-data-connection';
 import { CandidateType } from './webrtc-stats';
+import { getCookie,setCookie } from './cookie'; // 2022/05/28 Takayama追加
 
 // @types/skywayを使用すると@types/webrtcが定義エラーになるので代替定義
 declare var Peer;
@@ -179,53 +180,71 @@ export class SkyWayConnection implements Connection {
       console.warn('It is already opened.');
       this.close();
     }
-    let peer = new Peer(this.peerContext.peerId, { key: this.key });// SkyWay
-    peer.on('open', id => {
-      console.log('My peer ID is: ' + id);
-      if (!this.peerContext || this.peerContext.peerId !== id) {
-        this.peerContext = PeerContext.parse(id);
-      }
-      this.peerContext.isOpen = true;
-      console.log('My peer Context', this.peerContext);
-      if (this.callback.onOpen) this.callback.onOpen(this.peerId);
-    });
+    
+    // 2022/05/28 Takayama 追加ここから
+    const cookieName = "SkyWayKey";
+    let varres = prompt( "SkyWay key" , getCookie(cookieName) );
+    let strKey=(varres) ? varres.toString() : "";
+    this.key = strKey;
+    
+    if(this.key){if(this.key!=""){
+    // 2022/05/28 Takayama 追加ここまで
+    
+      let peer = new Peer(this.peerContext.peerId, { key: this.key });// SkyWay
+      peer.on('open', id => {
+        console.log('My peer ID is: ' + id);
+        if (!this.peerContext || this.peerContext.peerId !== id) {
+          this.peerContext = PeerContext.parse(id);
+        }
+        this.peerContext.isOpen = true;
+        console.log('My peer Context', this.peerContext);
+        if (this.callback.onOpen) this.callback.onOpen(this.peerId);
+        
+        if(this.key){if(this.key!=""){ setCookie(cookieName,this.key); }}   // 2022/05/28 Takayama 追加
+        
+      });
 
-    peer.on('close', () => {
-      console.log('Peer close');
-      if (this.peerContext && this.peerContext.isOpen) {
-        this.peerContext.isOpen = false;
-        if (this.callback.onClose) this.callback.onClose(this.peerId);
-      }
-    });
+      peer.on('close', () => {
+        console.log('Peer close');
+        if (this.peerContext && this.peerContext.isOpen) {
+          this.peerContext.isOpen = false;
+          if (this.callback.onClose) this.callback.onClose(this.peerId);
+        }
+      });
 
-    peer.on('connection', conn => {
-      this.openDataConnection(new SkyWayDataConnection(conn));
-    });
+      peer.on('connection', conn => {
+        this.openDataConnection(new SkyWayDataConnection(conn));
+      });
 
-    peer.on('error', err => {
-      console.error('<' + this.peerId + '> ' + err.type + ' => ' + err.message);
-      let errorMessage = `${this.getSkyWayErrorMessage(err.type)}\n\n${err.type}: ${err.message}`;
-      switch (err.type) {
-        case 'peer-unavailable':
-          let peerId = /"(.+)"/.exec(err.message)[1];
-          this.disconnect(peerId);
-          break;
-        case 'disconnected':
-        case 'socket-error':
-        case 'unavailable-id':
-        case 'authentication':
-        case 'server-error':
-          if (this.peerContext && this.peerContext.isOpen) {
-            this.close();
-            if (this.callback.onClose) this.callback.onClose(this.peerId);
-          }
-          break;
-        default:
-          break;
-      }
-      if (this.callback.onError) this.callback.onError(this.peerId, err.type, errorMessage, err);
-    });
-    this.peer = peer;
+      peer.on('error', err => {
+        console.error('<' + this.peerId + '> ' + err.type + ' => ' + err.message);
+        let errorMessage = `${this.getSkyWayErrorMessage(err.type)}\n\n${err.type}: ${err.message}`;
+        switch (err.type) {
+          case 'peer-unavailable':
+            let peerId = /"(.+)"/.exec(err.message)[1];
+            this.disconnect(peerId);
+            break;
+          case 'disconnected':
+          case 'socket-error':
+          case 'unavailable-id':
+          case 'authentication':
+          case 'server-error':
+            if (this.peerContext && this.peerContext.isOpen) {
+              this.close();
+              if (this.callback.onClose) this.callback.onClose(this.peerId);
+            }
+            break;
+          default:
+            break;
+        }
+      
+        if (this.callback.onError) this.callback.onError(this.peerId, err.type, errorMessage, err);
+      });
+      
+      this.peer = peer;
+    
+    }} // 2022/05/28 Takayama 追加
+    
   }
 
   private openDataConnection(conn: SkyWayDataConnection) {

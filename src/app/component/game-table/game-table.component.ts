@@ -24,7 +24,7 @@ import { TabletopActionService } from 'service/tabletop-action.service';
 import { TabletopService } from 'service/tabletop.service';
 
 import { GridLineRender } from './grid-line-render';
-import { TableMouseGesture } from './table-mouse-gesture';
+import { TableMouseGesture , myMtrxP ,swTableRotateCenterFlg } from './table-mouse-gesture';  // 2022/05/28 Takayama 追加：{myMtrx,myMtrxP,myPlane3D  , swTableRotateCenterFlg}を追加
 import { TableTouchGesture } from './table-touch-gesture';
 
 @Component({
@@ -57,13 +57,13 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
 
   get isPointerDragging(): boolean { return this.pointerDeviceService.isDragging; }
 
-  private viewPotisonX: number = 100;
-  private viewPotisonY: number = 0;
-  private viewPotisonZ: number = 0;
+  public viewPotisonX: number = 100; // 2022/05/28 Takayama変更  private⇒public
+  public viewPotisonY: number = 0;   // 2022/05/28 Takayama変更  private⇒public
+  public viewPotisonZ: number = 0;   // 2022/05/28 Takayama変更  private⇒public
 
-  private viewRotateX: number = 50;
-  private viewRotateY: number = 0;
-  private viewRotateZ: number = 10;
+  public viewRotateX: number = 50;   // 2022/05/28 Takayama変更  private⇒public
+  public viewRotateY: number = 0;    // 2022/05/28 Takayama変更  private⇒public
+  public viewRotateZ: number = 10;   // 2022/05/28 Takayama変更  private⇒public
 
   private mouseGesture: TableMouseGesture = null;
   private touchGesture: TableTouchGesture = null;
@@ -137,6 +137,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.mouseGesture.onstart = this.onTableMouseStart.bind(this);
     this.mouseGesture.onend = this.onTableMouseEnd.bind(this);
     this.mouseGesture.ontransform = this.onTableMouseTransform.bind(this);
+    
+    this.mouseGesture.parent = this;         // 2022/05/28 Takayama追加  TableMouseGestureからGameTableComponentのプロパティを参照するため
   }
 
   onTableTouchStart() {
@@ -245,7 +247,53 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     this.viewPotisonY += transformY;
     this.viewPotisonZ += transformZ;
 
-    this.gameTable.nativeElement.style.transform = 'translateZ(' + this.viewPotisonZ + 'px) translateY(' + this.viewPotisonY + 'px) translateX(' + this.viewPotisonX + 'px) rotateY(' + this.viewRotateY + 'deg) rotateX(' + this.viewRotateX + 'deg) rotateZ(' + this.viewRotateZ + 'deg) ';
+    // 2022/05/28 Takayama追加ここから
+    
+
+    let strSTF='';
+    switch(swTableRotateCenterFlg){ // =1 で 画面中心回転
+      case 1:      // 画面中心回転
+        let wch,wcw; // 画像サイズ(MAP拡縮後)
+        wch = this.gameTable.nativeElement.clientHeight;
+        wcw = this.gameTable.nativeElement.clientWidth;
+        let wiw,wih; // ウインドウサイズ
+        wiw = window.innerWidth;
+        wih = window.innerHeight;
+        
+        // transformOriginを設定
+        let wx =0;
+        if(wcw<=wiw){
+            wx = wcw/2;
+        }else{
+            wx = wiw/2;
+        }
+        
+        this.gameTable.nativeElement.style.transformOrigin= ""+(wx-this.viewPotisonX)+"px "+(wch/2-this.viewPotisonY)+"px";
+        
+        // Styleに反映
+        strSTF +=' translateX(' + (this.viewPotisonX) + 'px)';
+        strSTF +=' translateY(' + (this.viewPotisonY) + 'px)';
+        strSTF +=' translateZ(' + (this.viewPotisonZ) + 'px)';
+        strSTF +=' rotateX(' + this.viewRotateX + 'deg)';
+        strSTF +=' rotateY(' + this.viewRotateY + 'deg)';
+        strSTF +=' rotateZ(' + this.viewRotateZ + 'deg)';
+        break; 
+      default:    // テーブル中心回転
+        strSTF +=' translateZ(' + (this.viewPotisonZ) + 'px)';
+        strSTF +=' translateY(' + (this.viewPotisonY) + 'px)';
+        strSTF +=' translateX(' + (this.viewPotisonX) + 'px)';
+        strSTF +=' rotateY(' + this.viewRotateY + 'deg)';
+        strSTF +=' rotateX(' + this.viewRotateX + 'deg)';
+        strSTF +=' rotateZ(' + this.viewRotateZ + 'deg)';
+    }
+    
+    // 2022/05/28 Takayama追加ここまで
+    
+    this.gameTable.nativeElement.style.transform = strSTF;  // 2022/05/28 Takayama変更
+    // this.gameTable.nativeElement.style.transform = 'translateZ(' + this.viewPotisonZ + 'px) translateY(' + this.viewPotisonY + 'px) translateX(' + this.viewPotisonX + 'px) rotateY(' + this.viewRotateY + 'deg) rotateX(' + this.viewRotateX + 'deg) rotateZ(' + this.viewRotateZ + 'deg) ';
+
+
+
   }
 
   private setGameTableGrid(width: number, height: number, gridSize: number = 50, gridType: GridType = GridType.SQUARE, gridColor: string = '#000000e6') {
